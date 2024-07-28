@@ -84,6 +84,9 @@ typedef struct
 #define PFIC_KEY3               ((uint32_t)0xBEEF0000)
 
 /* ##########################   define  #################################### */
+
+typedef unsigned long irq_ctx_t;
+
 #define __nop()                 __asm__ volatile("nop")
 
 #define read_csr(reg)           ({unsigned long __tmp;                        \
@@ -95,6 +98,16 @@ typedef struct
       __asm__ volatile ("csrw  " #reg ", %0" :: "i"(val));              \
     else                                                            \
       __asm__ volatile ("csrw  " #reg ", %0" :: "r"(val)); })
+
+#define csr_read_clear(reg, bitmask)     ({irq_ctx_t __tmp;                        \
+        if (__builtin_constant_p(bitmask) && (irq_ctx_t)(bitmask) < 32)    \
+              __asm__ volatile ("csrrci %0 ," #reg ", %1" : "=r"(__tmp) : "i"(bitmask));              \
+            else                                                            \
+              __asm__ volatile ("csrrc %0, " #reg ", %1" : "=r"(__tmp) : "r"(bitmask));                \
+         __tmp; })
+
+#define irq_save_ctx_and_disable()       csr_read_clear(0x800, 0x08)
+#define irq_restore_ctx(irq_ctx)         write_csr(0x800, irq_ctx)
 
 #define PFIC_EnableAllIRQ()     {write_csr(0x800, 0x88);__nop();__nop();}
 #define PFIC_DisableAllIRQ()    {write_csr(0x800, 0x80);__nop();__nop();}
