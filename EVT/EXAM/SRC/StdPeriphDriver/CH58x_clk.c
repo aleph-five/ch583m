@@ -141,8 +141,6 @@ uint8_t LSE_Init(void)
     mDelaymS(200);
     LSECFG_Current(LSE_RCur_100);
 
-    R8_CK32K_CONFIG |= RB_CLK_OSC32K_XT;
-
     // Switch off internal oscillator for power save
     sys_safe_access_enter();
     R8_CK32K_CONFIG &= ~RB_CLK_INT32K_PON;
@@ -152,14 +150,9 @@ uint8_t LSE_Init(void)
     LClk32K_Select(Clk32K_LSE);
 
     // Wait for half cycle at least
-    if(_WaitForHalfCycleAtLeast())
-    {
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
+    int32_t status = _WaitForHalfCycleAtLeast();
+    irq_restore_ctx(irq_ctx);
+    return status;
 }
 
 /*********************************************************************

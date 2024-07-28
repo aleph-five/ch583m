@@ -192,6 +192,14 @@ typedef enum
 void LClk32K_Select(LClk32KTypeDef hc);
 
 /**
+ * @brief   LSE initialization procedure
+ *
+ *
+ * @return  1 if run successfully, 0 otherwise
+ */
+uint8_t LSE_Init(void);
+
+/**
  * @brief   HSE¾§Ìå Æ«ÖÃµçÁ÷ÅäÖÃ
  *
  * @param   c   - 75%,100%,125%,150%
