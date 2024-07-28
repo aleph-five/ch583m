@@ -12,6 +12,50 @@
 
 #include "CH58x_common.h"
 
+#define CLK_ATRIBUTE_OPTIMIZE_FAST                          __attribute__((optimize("-Ofast")))
+#define CLK_ATRIBUTE_OPTIMIZE_SIZE                          __attribute__((optimize("-Os")))
+#define CLK_ATTRIBUTE_FORCE_INLINE                          __attribute__((always_inline))
+
+typedef struct
+{
+    uint32_t days;
+    uint32_t ticks;
+}
+rtc_datetime_t;
+
+
+#define RTC_GetDateTime() ({ \
+    uint32_t t, ticks;\
+    uint16_t days, days_again;\
+\
+  /* This procedure is needed because we can read between day change */ \
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();\
+    days = R32_RTC_CNT_DAY;\
+    ticks = R32_RTC_CNT_32K;\
+    days_again = R32_RTC_CNT_DAY;\
+    irq_restore_ctx(irq_ctx);\
+\
+\
+    days &= RTC_CNT_DAY_MSK;\
+    days_again &= RTC_CNT_DAY_MSK;\
+\
+    /* if days and days_again are not equal, then we read between day change,
+    so we need read number of ticks again*/ \
+    if(days != days_again)\
+    {\
+        ticks = R32_RTC_CNT_32K;\
+        days = days_again;\
+    }\
+\
+    rtc_datetime_t datetime = {\
+        .days = days,\
+        .ticks = ticks\
+    };\
+\
+    datetime;\
+})
+
+
 /*********************************************************************
  * @fn      LClk32K_Select
  *
@@ -23,6 +67,8 @@
  */
 void LClk32K_Select(LClk32KTypeDef hc)
 {
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     uint8_t cfg = R8_CK32K_CONFIG;
 
     if(hc == Clk32K_LSI)
@@ -35,9 +81,85 @@ void LClk32K_Select(LClk32KTypeDef hc)
         cfg |= RB_CLK_OSC32K_XT;
     }
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_CK32K_CONFIG = cfg;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
+}
+
+CLK_ATRIBUTE_OPTIMIZE_FAST
+static int32_t _WaitForHalfCycleAtLeast(void)
+{
+    int32_t status = 0;
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
+    uint32_t times = GetSysClock() / 50;
+    uint32_t i = times;
+    uint8_t clk_pin = (R8_CK32K_CONFIG & RB_32K_CLK_PIN);
+    while(--i)
+    {
+        uint8_t clk_pin_temp;
+        if((clk_pin_temp = (R8_CK32K_CONFIG & RB_32K_CLK_PIN)) != clk_pin)
+        {
+            clk_pin = clk_pin_temp;
+            status = 1;
+            break;
+        }
+    }
+    if(status)
+    {
+        status = 0;
+        i = times;
+        while(--times)
+        {
+            if(clk_pin != (R8_CK32K_CONFIG & RB_32K_CLK_PIN))
+            {
+                status = 1;
+                break;
+            }
+        }
+    }
+
+    irq_restore_ctx(irq_ctx);
+    return status;
+}
+
+// This procedure of LSE initialization is according to ch.6.4.1 of datasheet v1.8
+uint8_t LSE_Init(void)
+{
+    // Disable digital pins for LSE crystal oscillator
+    R16_PIN_ANALOG_IE |= RB_PIN_XT32K_IE;
+    GPIOA_ModeCfg(bX32KI | bX32KO, GPIO_ModeIN_Floating);
+
+    // Enable external oscillator
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
+    R8_CK32K_CONFIG |= RB_CLK_XT32K_PON;
+
+    // Change to max current first, wait for stabilizing, change to rated current
+    LSECFG_Current(LSE_RCur_200);
+    mDelaymS(200);
+    LSECFG_Current(LSE_RCur_100);
+
+    R8_CK32K_CONFIG |= RB_CLK_OSC32K_XT;
+
+    // Switch off internal oscillator for power save
+    sys_safe_access_enter();
+    R8_CK32K_CONFIG &= ~RB_CLK_INT32K_PON;
+    sys_safe_access_exit();
+
+    // Switch to LSE
+    LClk32K_Select(Clk32K_LSE);
+
+    // Wait for half cycle at least
+    if(_WaitForHalfCycleAtLeast())
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 /*********************************************************************
@@ -52,13 +174,14 @@ void LClk32K_Select(LClk32KTypeDef hc)
 void HSECFG_Current(HSECurrentTypeDef c)
 {
     uint8_t x32M_c;
-
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     x32M_c = R8_XT32M_TUNE;
     x32M_c = (x32M_c & 0xfc) | (c & 0x03);
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32M_TUNE = x32M_c;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -73,13 +196,15 @@ void HSECFG_Current(HSECurrentTypeDef c)
 void HSECFG_Capacitance(HSECapTypeDef c)
 {
     uint8_t x32M_c;
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
 
     x32M_c = R8_XT32M_TUNE;
     x32M_c = (x32M_c & 0x8f) | (c << 4);
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32M_TUNE = x32M_c;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -95,12 +220,15 @@ void LSECFG_Current(LSECurrentTypeDef c)
 {
     uint8_t x32K_c;
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     x32K_c = R8_XT32K_TUNE;
     x32K_c = (x32K_c & 0xfc) | (c & 0x03);
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32K_TUNE = x32K_c;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -116,12 +244,15 @@ void LSECFG_Capacitance(LSECapTypeDef c)
 {
     uint8_t x32K_c;
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     x32K_c = R8_XT32K_TUNE;
     x32K_c = (x32K_c & 0x0f) | (c << 4);
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32K_TUNE = x32K_c;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -131,7 +262,7 @@ void LSECFG_Capacitance(LSECapTypeDef c)
  *
  * @param   cali_Lv - 校准等级选择    Level_32 ：2.4ms   1000ppm (32M 主频)  1100ppm (60M 主频)
  *                                   Level_64 ：4.4ms   800ppm  (32M 主频)  1000ppm (60M 主频)
- *                                   Level_128 ：8.4ms  600ppm  (32M 主频)  800ppm  (60M 主频)                                                         
+ *                                   Level_128 ：8.4ms  600ppm  (32M 主频)  800ppm  (60M 主频)
  *
  * @return  none
  */
@@ -351,6 +482,8 @@ void RTC_InitTime(uint16_t y, uint16_t mon, uint16_t d, uint16_t h, uint16_t m, 
     t = sec2;
     t = t << 16 | t32k;
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     do
     {
         clk_pin = (R8_CK32K_CONFIG & RB_32K_CLK_PIN);
@@ -366,15 +499,16 @@ void RTC_InitTime(uint16_t y, uint16_t mon, uint16_t d, uint16_t h, uint16_t m, 
         }
     }
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R32_RTC_TRIG = day;
     R8_RTC_MODE_CTRL |= RB_RTC_LOAD_HI;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
     while((R32_RTC_TRIG & 0x3FFF) != (R32_RTC_CNT_DAY & 0x3FFF));
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R32_RTC_TRIG = t;
     R8_RTC_MODE_CTRL |= RB_RTC_LOAD_LO;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -391,16 +525,15 @@ void RTC_InitTime(uint16_t y, uint16_t mon, uint16_t d, uint16_t h, uint16_t m, 
  *
  * @return  none
  */
+CLK_ATRIBUTE_OPTIMIZE_FAST
 void RTC_GetTime(uint16_t *py, uint16_t *pmon, uint16_t *pd, uint16_t *ph, uint16_t *pm, uint16_t *ps)
 {
     uint32_t t;
     uint16_t day, sec2, t32k;
 
-    day = R32_RTC_CNT_DAY & 0x3FFF;
-    sec2 = R16_RTC_CNT_2S;
-    t32k = R16_RTC_CNT_32K;
-
-    t = sec2 * 2 + ((t32k < 0x8000) ? 0 : 1);
+    rtc_datetime_t datetime = RTC_GetDateTime();
+    day = datetime.days;
+    t = RTC_CYCLES_TO_SEC(datetime.ticks);
 
     *py = BEGYEAR;
     while(day >= YearLength(*py))
@@ -433,39 +566,20 @@ void RTC_GetTime(uint16_t *py, uint16_t *pmon, uint16_t *pd, uint16_t *ph, uint1
  */
 void RTC_SetCycle32k(uint32_t cyc)
 {
-    volatile uint8_t clk_pin;
+    uint8_t clk_pin;
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
 
+    // don't understand why this code snippet is here
     do
     {
         clk_pin = (R8_CK32K_CONFIG & RB_32K_CLK_PIN);
     } while((clk_pin != (R8_CK32K_CONFIG & RB_32K_CLK_PIN)) || (!clk_pin));
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R32_RTC_TRIG = cyc;
     R8_RTC_MODE_CTRL |= RB_RTC_LOAD_LO;
-    sys_safe_access_disable();
-}
-
-/*********************************************************************
- * @fn      RTC_GetCycle32k
- *
- * @brief   基于LSE/LSI时钟，获取当前RTC 周期数
- *
- * @param   none
- *
- * @return  当前周期数，MAX_CYC = 0xA8BFFFFF = 2831155199
- */
-__HIGH_CODE
-uint32_t RTC_GetCycle32k(void)
-{
-    volatile uint32_t i;
-
-    do
-    {
-        i = R32_RTC_CNT_32K;
-    } while(i != R32_RTC_CNT_32K);
-
-    return (i);
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -479,12 +593,13 @@ uint32_t RTC_GetCycle32k(void)
  */
 void RTC_TMRFunCfg(RTC_TMRCycTypeDef t)
 {
-    sys_safe_access_enable();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
     R8_RTC_MODE_CTRL &= ~(RB_RTC_TMR_EN | RB_RTC_TMR_MODE);
-    sys_safe_access_disable();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_RTC_MODE_CTRL |= RB_RTC_TMR_EN | (t);
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -496,20 +611,31 @@ void RTC_TMRFunCfg(RTC_TMRCycTypeDef t)
  *
  * @return  none
  */
+CLK_ATRIBUTE_OPTIMIZE_FAST
 void RTC_TRIGFunCfg(uint32_t cyc)
 {
-    uint32_t t;
+    // TODO: need some clarification about cycle trigger value
+    uint32_t cyc_h = cyc >> 1;
+    uint32_t cyc_l = cyc & 1;
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
 
-    t = RTC_GetCycle32k() + cyc;
-    if(t > 0xA8C00000)
+    uint32_t cur_cyc = RTC_GetCycle32k();
+    uint32_t cur_cyc_h = cur_cyc >> 1;
+    uint32_t cur_cyc_l = cur_cyc & 1;
+
+    uint32_t t = cur_cyc_h + cyc_h;
+    if(t >= ((uint32_t)0xA8C00000 >> 1))
     {
-        t -= 0xA8C00000;
+        t -= ((uint32_t)0xA8C00000 >> 1);
     }
 
-    sys_safe_access_enable();
+    t = (t << 1) + cyc_l + cur_cyc_l;
+
+    sys_safe_access_enter();
     R32_RTC_TRIG = t;
     R8_RTC_MODE_CTRL |= RB_RTC_TRIG_EN;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -534,9 +660,11 @@ void RTC_ModeFunDisable(RTC_MODETypeDef m)
         i |= RB_RTC_TMR_EN;
     }
 
-    sys_safe_access_enable();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
     R8_RTC_MODE_CTRL &= ~(i);
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************

@@ -169,8 +169,6 @@ void mDelaymS(uint32_t t);
 
 extern volatile uint32_t IRQ_STA;
 
-typedef irq_ctx_t sys_safe_access_ctx_t;
-
 /**
  * @brief Enter safe access mode.
  * 

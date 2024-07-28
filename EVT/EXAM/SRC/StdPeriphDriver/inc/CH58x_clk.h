@@ -17,6 +17,16 @@
 extern "C" {
 #endif
 
+#define UNIXTIME_2020_BEGIN         0x5E0BE100
+#define SECONDS_IN_DAY              86400
+
+#define RTC_1SECDELAY               0x000008000 // num of RTC cycles for 1 sec delay
+#define SEC_TO_RTC_CYCLES(SEC)      ((SEC) << 15)
+#define RTC_CYCLES_TO_SEC(CYCLES)   ((CYCLES) >> 15)
+#define RTC_CNT_DAY_MSK             0x3FFF
+#define RTC_TICKS_IN_DAY            0xA8C00000
+#define RTC_TICKS_IN_HALF_SEC       0x4000
+
 /**
  * @brief  系统主频定义
  */
@@ -242,12 +252,12 @@ void RTC_GetTime(uint16_t *py, uint16_t *pmon, uint16_t *pd, uint16_t *ph, uint1
  */
 void RTC_SetCycle32k(uint32_t cyc);
 
-/**
- * @brief   基于LSE/LSI时钟，获取当前RTC 周期数
- *
- * @return  当前周期数，MAX_CYC = 0xA8BFFFFF = 2831155199
- */
-uint32_t RTC_GetCycle32k(void);
+///**
+// * @brief   基于LSE/LSI时钟，获取当前RTC 周期数
+// *
+// * @return  当前周期数，MAX_CYC = 0xA8BFFFFF = 2831155199
+// */
+//uint32_t RTC_GetCycle32k(void);
 
 /**
  * @brief   RTC定时模式配置（注意定时基准固定为32768Hz）
@@ -285,6 +295,28 @@ uint8_t RTC_GetITFlag(RTC_EVENTTypeDef f);
  * @param   f   - refer to RTC_EVENTTypeDef
  */
 void RTC_ClearITFlag(RTC_EVENTTypeDef f);
+
+/*********************************************************************
+ * @fn      RTC_GetCycle32k
+ *
+ * @brief   基于LSE/LSI时钟，获取当前RTC 周期数
+ *
+ * @param   none
+ *
+ * @return  当前周期数，MAX_CYC = 0xA8BFFFFF = 2831155199
+ */
+__HIGH_CODE
+__attribute__((optimize("-Ofast")))
+static inline uint32_t RTC_GetCycle32k(void)
+{
+    uint32_t i;
+    do
+    {
+        i = R32_RTC_CNT_32K;
+    } while(i != R32_RTC_CNT_32K);
+
+    return (i);
+}
 
 #ifdef __cplusplus
 }
