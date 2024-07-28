@@ -158,16 +158,18 @@ void WWDG_ClearFlag(void);
  *
  * @param   t       - 时间参数
  */
-void mDelayuS(uint16_t t);
+void mDelayuS(uint32_t t);
 
 /**
  * @brief   mS 延时
  *
  * @param   t       - 时间参数
  */
-void mDelaymS(uint16_t t);
+void mDelaymS(uint32_t t);
 
 extern volatile uint32_t IRQ_STA;
+
+typedef irq_ctx_t sys_safe_access_ctx_t;
 
 /**
  * @brief Enter safe access mode.
@@ -197,6 +199,23 @@ __attribute__((always_inline)) static inline void sys_safe_access_disable(void)
    IRQ_STA = 0;
    SAFEOPERATE;
 }
+
+#ifdef __GNUC__
+
+__attribute__((always_inline)) __attribute__((optimize("-Os"))) static inline void sys_safe_access_enter(void)
+{
+    SAFEOPERATE;
+    R8_SAFE_ACCESS_SIG = SAFE_ACCESS_SIG1;
+    R8_SAFE_ACCESS_SIG = SAFE_ACCESS_SIG2;
+    SAFEOPERATE;
+}
+
+__attribute__((always_inline)) __attribute__((optimize("-Os"))) static inline void sys_safe_access_exit(void)
+{
+    R8_SAFE_ACCESS_SIG = 0;
+    SAFEOPERATE;
+}
+#endif
 
 #ifdef __cplusplus
 }

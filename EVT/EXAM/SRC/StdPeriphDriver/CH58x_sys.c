@@ -23,19 +23,21 @@ volatile uint32_t IRQ_STA = 0;
  * @return  none
  */
 __HIGH_CODE
+__attribute__((optimize("-Os")))
 void SetSysClock(SYS_CLKTypeDef sc)
 {
     uint32_t i;
-    sys_safe_access_enable();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
     R8_PLL_CONFIG &= ~(1 << 5); //
-    sys_safe_access_disable();
-    if(sc & 0x20)
+    //sys_safe_access_exit();
+    if(sc & CLK_SOURCE_HSE)
     { // HSE div
         if(!(R8_HFCK_PWR_CTRL & RB_CLK_XT32M_PON))
         {
-            sys_safe_access_enable();
+            sys_safe_access_enter();
             R8_HFCK_PWR_CTRL |= RB_CLK_XT32M_PON; // HSE power on
-            sys_safe_access_disable();
+            //sys_safe_access_exit();
             for(i = 0; i < 1200; i++)
             {
                 __nop();
@@ -43,62 +45,62 @@ void SetSysClock(SYS_CLKTypeDef sc)
             }
         }
 
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R16_CLK_SYS_CFG = (0 << 6) | (sc & 0x1f);
         __nop();
         __nop();
         __nop();
         __nop();
-        sys_safe_access_disable();
-        sys_safe_access_enable();
+        //sys_safe_access_exit();
+        sys_safe_access_enter();
         SAFEOPERATE;
         R8_FLASH_CFG = 0X51;
-        sys_safe_access_disable();
+        sys_safe_access_exit();
     }
-
-    else if(sc & 0x40)
+    else if(sc & CLK_SOURCE_PLL)
     { // PLL div
         if(!(R8_HFCK_PWR_CTRL & RB_CLK_PLL_PON))
         {
-            sys_safe_access_enable();
+            sys_safe_access_enter();
             R8_HFCK_PWR_CTRL |= RB_CLK_PLL_PON; // PLL power on
-            sys_safe_access_disable();
+            //sys_safe_access_exit();
             for(i = 0; i < 2000; i++)
             {
                 __nop();
                 __nop();
             }
         }
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R16_CLK_SYS_CFG = (1 << 6) | (sc & 0x1f);
         __nop();
         __nop();
         __nop();
         __nop();
-        sys_safe_access_disable();
+        //sys_safe_access_exit();
         if(sc == CLK_SOURCE_PLL_80MHz)
         {
-            sys_safe_access_enable();
+            sys_safe_access_enter();
             R8_FLASH_CFG = 0X02;
-            sys_safe_access_disable();
+            //sys_safe_access_exit();
         }
         else
         {
-            sys_safe_access_enable();
+            sys_safe_access_enter();
             R8_FLASH_CFG = 0X52;
-            sys_safe_access_disable();
+            //sys_safe_access_exit();
         }
     }
     else
     {
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R16_CLK_SYS_CFG |= RB_CLK_SYS_MOD;
-        sys_safe_access_disable();
+        //sys_safe_access_exit();
     }
     //更改FLASH clk的驱动能力
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_PLL_CONFIG |= 1 << 7;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -110,6 +112,10 @@ void SetSysClock(SYS_CLKTypeDef sc)
  *
  * @return  Hz
  */
+#if(defined(DYNAMIC_FREQUENCY_SWITCHING) && (DYNAMIC_FREQUENCY_SWITCHING == 1))
+__HIGH_CODE
+#endif
+__attribute__((optimize("-Os")))
 uint32_t GetSysClock(void)
 {
     uint16_t rev;
@@ -128,6 +134,7 @@ uint32_t GetSysClock(void)
         return (32000);
     }
 }
+
 
 /*********************************************************************
  * @fn      SYS_GetInfoSta
@@ -319,9 +326,19 @@ void HardFault_Handler(void)
  *
  * @return  none
  */
+
 __HIGH_CODE
-void mDelayuS(uint16_t t)
+__attribute__((optimize("-Os")))
+void mDelayuS(uint32_t t)
 {
+#if(defined(DYNAMIC_FREQUENCY_SWITCHING) && (DYNAMIC_FREQUENCY_SWITCHING == 1))
+    uint32_t sys_freq_MHz = GetSysClock() / 1000000;
+    uint32_t i = (t * sys_freq_MHz) / 4;
+    if(!i)
+    {
+        i = t << 1;
+    }
+#else
     uint32_t i;
 #if(FREQ_SYS == 80000000)
     i = t * 20;
@@ -348,11 +365,13 @@ void mDelayuS(uint16_t t)
 #else
     i = t << 1;
 #endif
+#endif // DYNAMIC_FREQUENCY_SWITCHING
     do
     {
         __nop();
     } while(--i);
 }
+
 
 /*********************************************************************
  * @fn      mDelaymS
@@ -364,14 +383,28 @@ void mDelayuS(uint16_t t)
  * @return  none
  */
 __HIGH_CODE
-void mDelaymS(uint16_t t)
+__attribute__((optimize("-Os")))
+void mDelaymS(uint32_t t)
 {
-    uint16_t i;
+#if(defined(DYNAMIC_FREQUENCY_SWITCHING) && (DYNAMIC_FREQUENCY_SWITCHING == 1))
+    uint32_t sys_freq_MHz = GetSysClock() / 1000000;
+    uint32_t cycles = (1000 * sys_freq_MHz) / 4;
 
-    for(i = 0; i < t; i++)
+    for(uint32_t i = 0; i < t; i++)
+    {
+        uint32_t ii = cycles;
+        do
+        {
+            __nop();
+        }
+        while(--ii);
+    }
+#else
+    for(uint32_t i = 0; i < t; i++)
     {
         mDelayuS(1000);
     }
+#endif
 }
 
 #ifdef DEBUG

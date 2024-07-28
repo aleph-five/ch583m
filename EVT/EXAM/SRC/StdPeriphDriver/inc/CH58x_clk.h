@@ -25,6 +25,7 @@ typedef enum
     CLK_SOURCE_LSI = 0x00,
     CLK_SOURCE_LSE,
 
+    CLK_SOURCE_HSE       = 0x20,
     CLK_SOURCE_HSE_16MHz = 0x22,
     CLK_SOURCE_HSE_8MHz = 0x24,
     CLK_SOURCE_HSE_6_4MHz = 0x25,
@@ -32,6 +33,7 @@ typedef enum
     CLK_SOURCE_HSE_2MHz = (0x20 | 16),
     CLK_SOURCE_HSE_1MHz = (0x20 | 0),
 
+    CLK_SOURCE_PLL       = 0x40,
     CLK_SOURCE_PLL_80MHz = 0x46,
     CLK_SOURCE_PLL_60MHz = 0x48,
     CLK_SOURCE_PLL_48MHz = (0x40 | 10),

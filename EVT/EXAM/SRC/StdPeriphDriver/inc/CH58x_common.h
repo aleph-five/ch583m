@@ -48,9 +48,18 @@
 /**
  * @brief  系统主频时钟（Hz）
  */
-#ifndef	 FREQ_SYS
-#define  FREQ_SYS		60000000
+
+#ifndef DYNAMIC_FREQUENCY_SWITCHING
+#define DYNAMIC_FREQUENCY_SWITCHING 0
+#warning "Dynamic frequency switching disabled by default"
 #endif
+
+#if(DYNAMIC_FREQUENCY_SWITCHING == 0)
+#ifndef  FREQ_SYS
+#define  FREQ_SYS       60000000
+#warning "System frequency is 60 MHz by default"
+#endif
+#endif // DYNAMIC_FREQUENCY_SWITCHING == 0
 
 #ifndef  SAFEOPERATE
 #define  SAFEOPERATE   __nop();__nop()
@@ -88,10 +97,13 @@
 #include "CH58x_usbhost.h"
 #include "ISP583.h"
 
-
 #define DelayMs(x)      mDelaymS(x)
 #define DelayUs(x)      mDelayuS(x)
 
+#ifdef __GNUC__
+#else
+#error "Not implemented for other compilers"
+#endif
 
 #ifdef __cplusplus
 }
