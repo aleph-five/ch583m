@@ -92,42 +92,42 @@ void GPIOB_ModeCfg(uint32_t pin, GPIOModeTypeDef mode);
  *
  * @param   pin     - PA0-PA15
  */
-#define GPIOA_ResetBits(pin)      (R32_PA_CLR |= pin)
+#define GPIOA_ResetBits(pin)      (R32_PA_CLR = pin)
 
 /**
  * @brief   GPIOA端口引脚输出置高
  *
  * @param   pin     - PA0-PA15
  */
-#define GPIOA_SetBits(pin)        (R32_PA_OUT |= pin)
+#define GPIOA_SetBits(pin)        __AMOOR_W(&(R32_PA_OUT), pin)//(R32_PA_OUT |= pin)
 
 /**
  * @brief   GPIOB端口引脚输出置低
  *
  * @param   pin     - PB0-PB23
  */
-#define GPIOB_ResetBits(pin)      (R32_PB_CLR |= pin)
+#define GPIOB_ResetBits(pin)      (R32_PB_CLR = pin)
 
 /**
  * @brief   GPIOB端口引脚输出置高
  *
  * @param   pin     - PB0-PB23
  */
-#define GPIOB_SetBits(pin)        (R32_PB_OUT |= pin)
+#define GPIOB_SetBits(pin)        __AMOOR_W(&(R32_PB_OUT), pin) //(R32_PB_OUT |= pin)
 
 /**
  * @brief   GPIOA端口引脚输出电平翻转
  *
  * @param   pin     - PA0-PA15
  */
-#define GPIOA_InverseBits(pin)    (R32_PA_OUT ^= pin)
+#define GPIOA_InverseBits(pin)    __AMOXOR_W(&(R32_PA_OUT), pin)//(R32_PA_OUT ^= pin)
 
 /**
  * @brief   GPIOB端口引脚输出电平翻转
  *
  * @param   pin     - PB0-PB23
  */
-#define GPIOB_InverseBits(pin)    (R32_PB_OUT ^= pin)
+#define GPIOB_InverseBits(pin)    __AMOXOR_W(&(R32_PB_OUT), pin)//(R32_PB_OUT ^= pin)
 
 /**
  * @brief   GPIOA端口32位数据返回，低16位有效

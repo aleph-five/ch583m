@@ -24,6 +24,7 @@
  */
 void GPIOA_ModeCfg(uint32_t pin, GPIOModeTypeDef mode)
 {
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     switch(mode)
     {
         case GPIO_ModeIN_Floating:
@@ -57,6 +58,7 @@ void GPIOA_ModeCfg(uint32_t pin, GPIOModeTypeDef mode)
         default:
             break;
     }
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -71,6 +73,7 @@ void GPIOA_ModeCfg(uint32_t pin, GPIOModeTypeDef mode)
  */
 void GPIOB_ModeCfg(uint32_t pin, GPIOModeTypeDef mode)
 {
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     switch(mode)
     {
         case GPIO_ModeIN_Floating:
@@ -104,6 +107,7 @@ void GPIOB_ModeCfg(uint32_t pin, GPIOModeTypeDef mode)
         default:
             break;
     }
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -118,6 +122,7 @@ void GPIOB_ModeCfg(uint32_t pin, GPIOModeTypeDef mode)
  */
 void GPIOA_ITModeCfg(uint32_t pin, GPIOITModeTpDef mode)
 {
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     switch(mode)
     {
         case GPIO_ITMode_LowLevel: // 低电平触发
@@ -145,6 +150,7 @@ void GPIOA_ITModeCfg(uint32_t pin, GPIOITModeTpDef mode)
     }
     R16_PA_INT_IF = pin;
     R16_PA_INT_EN |= pin;
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -160,6 +166,7 @@ void GPIOA_ITModeCfg(uint32_t pin, GPIOITModeTpDef mode)
 void GPIOB_ITModeCfg(uint32_t pin, GPIOITModeTpDef mode)
 {
     uint32_t Pin = pin | ((pin & (GPIO_Pin_22 | GPIO_Pin_23)) >> 14);
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     switch(mode)
     {
         case GPIO_ITMode_LowLevel: // 低电平触发
@@ -187,6 +194,7 @@ void GPIOB_ITModeCfg(uint32_t pin, GPIOITModeTpDef mode)
     }
     R16_PB_INT_IF = Pin;
     R16_PB_INT_EN |= Pin;
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -215,6 +223,7 @@ void GPIOB_ITModeCfg(uint32_t pin, GPIOITModeTpDef mode)
  */
 void GPIOPinRemap(FunctionalState s, uint16_t perph)
 {
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     if(s)
     {
         R16_PIN_ALTERNATE |= perph;
@@ -223,6 +232,7 @@ void GPIOPinRemap(FunctionalState s, uint16_t perph)
     {
         R16_PIN_ALTERNATE &= ~perph;
     }
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -252,6 +262,7 @@ void GPIOPinRemap(FunctionalState s, uint16_t perph)
  */
 void GPIOAGPPCfg(FunctionalState s, uint16_t perph)
 {
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     if(s)
     {
         R16_PIN_ANALOG_IE |= perph;
@@ -260,4 +271,5 @@ void GPIOAGPPCfg(FunctionalState s, uint16_t perph)
     {
         R16_PIN_ANALOG_IE &= ~perph;
     }
+    irq_restore_ctx(irq_ctx);
 }
