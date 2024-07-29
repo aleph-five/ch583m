@@ -109,6 +109,7 @@ typedef unsigned long irq_ctx_t;
 #define irq_save_ctx_and_disable()       csr_read_clear(0x800, 0x08)
 #define irq_restore_ctx(irq_ctx)         write_csr(0x800, irq_ctx)
 
+
 #define PFIC_EnableAllIRQ()     {write_csr(0x800, 0x88);__nop();__nop();}
 #define PFIC_DisableAllIRQ()    {write_csr(0x800, 0x80);__nop();__nop();}
 /* ##########################   PFIC functions  #################################### */
@@ -336,7 +337,8 @@ __attribute__((always_inline)) RV_STATIC_INLINE void __SEV(void)
 __attribute__((always_inline)) RV_STATIC_INLINE void __WFI(void)
 {
     PFIC->SCTLR &= ~(1 << 3); // wfi
-    __asm__ volatile("wfi");
+    //PFIC->SCTLR |= (1 << 4); // sevonpend
+    __asm__ volatile("csrsi 0x800, 0x8\n\t" "wfi");
 }
 
 /*********************************************************************

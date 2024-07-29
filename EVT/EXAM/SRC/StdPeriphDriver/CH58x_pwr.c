@@ -26,29 +26,28 @@ void PWR_DCDCCfg(FunctionalState s)
     uint16_t adj = R16_AUX_POWER_ADJ;
     uint16_t plan = R16_POWER_PLAN;
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     if(s == DISABLE)
     {
-        
         adj &= ~RB_DCDC_CHARGE;
         plan &= ~(RB_PWR_DCDC_EN | RB_PWR_DCDC_PRE); // 旁路 DC/DC
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R16_AUX_POWER_ADJ = adj;
         R16_POWER_PLAN = plan;
-        sys_safe_access_disable();
     }
     else
     {
         adj |= RB_DCDC_CHARGE;
         plan |= RB_PWR_DCDC_PRE;
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R16_AUX_POWER_ADJ = adj;
         R16_POWER_PLAN = plan;
-        sys_safe_access_disable();
         DelayUs(10);
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R16_POWER_PLAN |= RB_PWR_DCDC_EN;
-        sys_safe_access_disable();
     }
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -77,10 +76,12 @@ void PWR_UnitModCfg(FunctionalState s, uint8_t unit)
         ck32k_cfg |= (unit & 0x03);
     }
 
-    sys_safe_access_enable();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
     R8_HFCK_PWR_CTRL = pwr_ctrl;
     R8_CK32K_CONFIG = ck32k_cfg;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -105,10 +106,11 @@ void PWR_PeriphClkCfg(FunctionalState s, uint16_t perph)
     {
         sleep_ctrl &= ~perph;
     }
-
-    sys_safe_access_enable();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
     R32_SLEEP_CONTROL = sleep_ctrl;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -130,11 +132,12 @@ void PWR_PeriphWakeUpCfg(FunctionalState s, uint8_t perph, WakeUP_ModeypeDef mod
 {
     uint8_t m;
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     if(s == DISABLE)
     {
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_SLP_WAKE_CTRL &= ~perph;
-        sys_safe_access_disable();
+        sys_safe_access_exit();
     }
     else
     {
@@ -153,16 +156,15 @@ void PWR_PeriphWakeUpCfg(FunctionalState s, uint8_t perph, WakeUP_ModeypeDef mod
                 break;
         }
 
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_SLP_WAKE_CTRL |= RB_WAKE_EV_MODE | perph;
-        sys_safe_access_disable();
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_SLP_POWER_CTRL &= ~(RB_WAKE_DLY_MOD);
-        sys_safe_access_disable();
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_SLP_POWER_CTRL |= m;
-        sys_safe_access_disable();
+        sys_safe_access_exit();
     }
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -180,11 +182,13 @@ void PowerMonitor(FunctionalState s, VolM_LevelypeDef vl)
     uint8_t ctrl = R8_BAT_DET_CTRL;
     uint8_t cfg = R8_BAT_DET_CFG;
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     if(s == DISABLE)
     {
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_BAT_DET_CTRL = 0;
-        sys_safe_access_disable();
+        sys_safe_access_exit();
     }
     else
     {
@@ -199,16 +203,16 @@ void PowerMonitor(FunctionalState s, VolM_LevelypeDef vl)
             cfg = vl & 0x03;
             ctrl = RB_BAT_DET_EN;
         }
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_BAT_DET_CTRL = ctrl;
         R8_BAT_DET_CFG = cfg;
-        sys_safe_access_disable();
 
         mDelayuS(1);
-        sys_safe_access_enable();
+        sys_safe_access_enter();
         R8_BAT_DET_CTRL |= RB_BAT_LOW_IE | RB_BAT_LOWER_IE;
-        sys_safe_access_disable();
+        sys_safe_access_exit();
     }
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -224,12 +228,13 @@ __HIGH_CODE
 void LowPower_Idle(void)
 {
     FLASH_ROM_SW_RESET();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     R8_FLASH_CTRL = 0x04; //flash关闭
-
     PFIC->SCTLR &= ~(1 << 2); // sleep
     __WFI();
     __nop();
     __nop();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -247,6 +252,7 @@ void LowPower_Halt(void)
     uint8_t x32Kpw, x32Mpw;
 
     FLASH_ROM_SW_RESET();
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
     R8_FLASH_CTRL = 0x04; //flash关闭
     x32Kpw = R8_XT32K_TUNE;
     x32Mpw = R8_XT32M_TUNE;
@@ -256,24 +262,24 @@ void LowPower_Halt(void)
         x32Kpw = (x32Kpw & 0xfc) | 0x01; // LSE驱动电流降低到额定电流
     }
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_BAT_DET_CTRL = 0; // 关闭电压监控
-    sys_safe_access_disable();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32K_TUNE = x32Kpw;
     R8_XT32M_TUNE = x32Mpw;
-    sys_safe_access_disable();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_PLL_CONFIG |= (1 << 5);
-    sys_safe_access_disable();
 
     PFIC->SCTLR |= (1 << 2); //deep sleep
     __WFI();
     __nop();
     __nop();
-    sys_safe_access_enable();
+    irq_restore_ctx(irq_ctx);
+    irq_ctx = irq_save_ctx_and_disable();
+    sys_safe_access_enter();
     R8_PLL_CONFIG &= ~(1 << 5);
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
 
 /*******************************************************************************
@@ -297,30 +303,31 @@ void LowPower_Sleep(uint8_t rm)
 
     GetMACAddress(MacAddr);
 
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     x32Mpw = R8_XT32M_TUNE;
     x32Mpw = (x32Mpw & 0xfc) | 0x03; // 150%额定电流
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_BAT_DET_CTRL = 0; // 关闭电压监控
-    sys_safe_access_disable();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32M_TUNE = x32Mpw;
-    sys_safe_access_disable();
 
     PFIC->SCTLR |= (1 << 2); //deep sleep
 
     power_plan = R16_POWER_PLAN & (RB_PWR_DCDC_EN | RB_PWR_DCDC_PRE);
     power_plan |= RB_PWR_PLAN_EN | RB_PWR_MUST_0010 | RB_PWR_CORE | rm;
     __nop();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_SLP_POWER_CTRL |= RB_RAM_RET_LV;
     R8_PLL_CONFIG |= (1 << 5);
     R16_POWER_PLAN = power_plan;
-    sys_safe_access_disable();
     do{
         __WFI();
         __nop();
         __nop();
+        irq_restore_ctx(irq_ctx);
+        irq_ctx = irq_save_ctx_and_disable();
         DelayUs(300);
 
         {
@@ -333,14 +340,14 @@ void LowPower_Sleep(uint8_t rm)
         }
     }while(1);
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R16_POWER_PLAN &= ~RB_PWR_PLAN_EN;
-    sys_safe_access_disable();
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_PLL_CONFIG &= ~(1 << 5);
-    sys_safe_access_disable();
+    sys_safe_access_exit();
     DelayUs(20);
+    irq_restore_ctx(irq_ctx);
 }
 
 /*********************************************************************
@@ -362,6 +369,9 @@ void LowPower_Shutdown(uint8_t rm)
     uint8_t x32Kpw, x32Mpw;
 
     FLASH_ROM_SW_RESET();
+
+    irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
+
     x32Kpw = R8_XT32K_TUNE;
     x32Mpw = R8_XT32M_TUNE;
     x32Mpw = (x32Mpw & 0xfc) | 0x03; // 150%额定电流
@@ -370,28 +380,26 @@ void LowPower_Shutdown(uint8_t rm)
         x32Kpw = (x32Kpw & 0xfc) | 0x01; // LSE驱动电流降低到额定电流
     }
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_BAT_DET_CTRL = 0; // 关闭电压监控
-    sys_safe_access_disable();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_XT32K_TUNE = x32Kpw;
     R8_XT32M_TUNE = x32Mpw;
-    sys_safe_access_disable();
+    sys_safe_access_enter();
     SetSysClock(CLK_SOURCE_HSE_6_4MHz);
 
     PFIC->SCTLR |= (1 << 2); //deep sleep
 
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_SLP_POWER_CTRL |= RB_RAM_RET_LV;
-    sys_safe_access_disable();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R16_POWER_PLAN = RB_PWR_PLAN_EN | RB_PWR_MUST_0010 | rm;
-    sys_safe_access_disable();
     __WFI();
     __nop();
     __nop();
     FLASH_ROM_SW_RESET();
-    sys_safe_access_enable();
+    sys_safe_access_enter();
     R8_RST_WDOG_CTRL |= RB_SOFTWARE_RESET;
-    sys_safe_access_disable();
+    sys_safe_access_exit();
+    irq_restore_ctx(irq_ctx);
 }
