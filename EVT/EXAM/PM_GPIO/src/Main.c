@@ -14,7 +14,7 @@
  注意：切换到HSE时钟源，所需等待稳定时间和选择的外置晶体参数有关，选择一款新的晶体最好阅读厂家提供的晶体及其
  负载电容参数值。通过配置R8_XT32M_TUNE寄存器，可以配置不同的负载电容和偏置电流，调整晶体稳定时间。
  */
-
+#include <stdbool.h>
 #include "CH58x_common.h"
 
 __HIGH_CODE
@@ -130,10 +130,13 @@ int main()
 
 
 static volatile uint32_t nextAfterWFI = 0;
+static bool bypass = false;
 
+__attribute__((noinline))
 __HIGH_CODE
 void wfi_overjump(void)
 {
+    bypass = true;
     if((PFIC->GISR & 0xFF) == 1)
     {
         uint32_t naw = __AMOSWAP_W(&nextAfterWFI, 0);
@@ -153,6 +156,7 @@ __attribute__((always_inline)) RV_STATIC_INLINE void __WFI_safe(void)
 {
     PFIC->SCTLR &= ~(1 << 3); // wfi
     //PFIC->SCTLR |= (1 << 4); // sevonpend
+    // Global interrupts must be already disabled before executing this asm inline
     __asm__ volatile(
                          "la t6, next_after_wfi\n\t"
                          "sw t6, %0\n\t"
@@ -167,12 +171,16 @@ __attribute__((always_inline)) RV_STATIC_INLINE void __WFI_safe(void)
 __HIGH_CODE
 void LowPower_Idle_safe(void)
 {
-    FLASH_ROM_SW_RESET();
     irq_ctx_t irq_ctx = irq_save_ctx_and_disable();
-    R8_FLASH_CTRL = 0x04; //flash关闭
-    PFIC->SCTLR &= ~(1 << 2); // sleep
-    __WFI_safe();
-    __nop();
+    if(!bypass)
+    {
+        FLASH_ROM_SW_RESET();
+        R8_FLASH_CTRL = 0x04; //flash关闭
+        PFIC->SCTLR &= ~(1 << 2); // sleep
+        __WFI_safe();
+        __nop();
+    }
+    bypass = false;
     irq_restore_ctx(irq_ctx);
 }
 
