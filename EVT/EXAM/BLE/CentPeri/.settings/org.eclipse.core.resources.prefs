@@ -1,0 +1,15 @@
+eclipse.preferences.version=1
+encoding//APP/active.c=GBK
+encoding//APP/active_processor.c=GBK
+encoding//APP/centPeri_main.c=GBK
+encoding//APP/hsm.c=GBK
+encoding//APP/include/active.h=GBK
+encoding//APP/include/active_common.h=GBK
+encoding//APP/include/active_processor.h=GBK
+encoding//APP/include/evt_queue.h=GBK
+encoding//APP/include/hsm.h=GBK
+encoding//APP/peripheral.c=GBK
+encoding//HAL/led-scheduler/led_scheduler.h=GBK
+encoding//LIB/CH58xBLE_LIB.h=UTF-8
+encoding//Startup/startup_CH583.S=GBK
+encoding//StdPeriphDriver/inc/CH58x_common.h=GBK

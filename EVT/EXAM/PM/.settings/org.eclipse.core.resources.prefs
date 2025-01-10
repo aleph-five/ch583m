@@ -1,0 +1,12 @@
+eclipse.preferences.version=1
+encoding//RVMSIS/core_riscv.h=GBK
+encoding//StdPeriphDriver/CH58x_clk.c=GBK
+encoding//StdPeriphDriver/CH58x_gpio.c=GBK
+encoding//StdPeriphDriver/CH58x_pwr.c=GBK
+encoding//StdPeriphDriver/CH58x_sys.c=GBK
+encoding//StdPeriphDriver/inc/CH583SFR.h=GBK
+encoding//StdPeriphDriver/inc/CH58x_clk.h=GBK
+encoding//StdPeriphDriver/inc/CH58x_common.h=GBK
+encoding//StdPeriphDriver/inc/CH58x_gpio.h=GBK
+encoding//obj/PM.lst=GBK
+encoding//src/Main.c=GBK

@@ -1,2 +1,15 @@
 eclipse.preferences.version=1
+encoding//APP/peripheral_main.c=GBK
+encoding//HAL/LED.c=GBK
+encoding//HAL/include/HAL.h=GBK
+encoding//HAL/include/LED.h=GBK
+encoding//HAL/led-scheduler/config/led_scheduler_config.h=GBK
+encoding//HAL/led-scheduler/led_scheduler.c=GBK
+encoding//HAL/led-scheduler/led_scheduler.h=GBK
+encoding//HAL/led-scheduler/portable/led_timer.c=GBK
 encoding//LIB/CH58xBLE_LIB.h=UTF-8
+encoding//Profile/gattprofile.c=GBK
+encoding//StdPeriphDriver/inc/CH583SFR.h=GBK
+encoding//StdPeriphDriver/inc/CH58x_common.h=GBK
+encoding//config/config.h=GBK
+encoding//config/led_scheduler_config.h=GBK
