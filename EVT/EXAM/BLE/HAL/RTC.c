@@ -60,6 +60,7 @@ void RTC_IRQHandler(void)
 {
     R8_RTC_FLAG_CTRL = (RB_RTC_TMR_CLR | RB_RTC_TRIG_CLR);
     RTCTigFlag = 1;
+    HAL_SLEEP_ISR_POST_PROCESS();
 }
 
 /*******************************************************************************

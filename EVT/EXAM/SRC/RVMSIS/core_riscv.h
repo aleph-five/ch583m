@@ -87,7 +87,7 @@ typedef struct
 
 typedef unsigned long irq_ctx_t;
 
-#define __nop()                 __asm__ volatile("nop")
+#define __nop()                 __asm__ volatile("nop"  ::: "memory")
 
 #define read_csr(reg)           ({unsigned long __tmp;                        \
      __asm__ volatile ("csrr %0, " #reg : "=r"(__tmp));                 \
@@ -95,19 +95,19 @@ typedef unsigned long irq_ctx_t;
 
 #define write_csr(reg, val)     ({                                      \
     if (__builtin_constant_p(val) && (unsigned long)(val) < 32)    \
-      __asm__ volatile ("csrw  " #reg ", %0" :: "i"(val));              \
+      __asm__ volatile ("csrw  " #reg ", %0" :: "i"(val) : "memory");              \
     else                                                            \
-      __asm__ volatile ("csrw  " #reg ", %0" :: "r"(val)); })
+      __asm__ volatile ("csrw  " #reg ", %0" :: "r"(val) : "memory"); })
 
 #define csr_read_clear(reg, bitmask)     ({irq_ctx_t __tmp;                        \
         if (__builtin_constant_p(bitmask) && (irq_ctx_t)(bitmask) < 32)    \
-              __asm__ volatile ("csrrci %0 ," #reg ", %1" : "=r"(__tmp) : "i"(bitmask));              \
+              __asm__ volatile ("csrrci %0 ," #reg ", %1" : "=r"(__tmp) : "i"(bitmask) : "memory");              \
             else                                                            \
-              __asm__ volatile ("csrrc %0, " #reg ", %1" : "=r"(__tmp) : "r"(bitmask));                \
+              __asm__ volatile ("csrrc %0, " #reg ", %1" : "=r"(__tmp) : "r"(bitmask) : "memory");                \
          __tmp; })
 
-#define irq_save_ctx_and_disable()       csr_read_clear(0x800, 0x08)
-#define irq_restore_ctx(irq_ctx)         write_csr(0x800, irq_ctx)
+#define irq_save_ctx_and_disable()       csr_read_clear(0x800, 0x08); __nop();__nop();
+#define irq_restore_ctx(irq_ctx)         write_csr(0x800, irq_ctx); __nop(); __nop();
 
 
 #define PFIC_EnableAllIRQ()     {write_csr(0x800, 0x88);__nop();__nop();}
